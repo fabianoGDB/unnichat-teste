@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// Isolamento multi-tenant: cada documento carrega o userId do dono (sem subcoleções)
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner(data) { return signedIn() && data.userId == request.auth.uid; }
+    function ownsConnection(connectionId) {
+      return get(/databases/$(database)/documents/connections/$(connectionId)).data.userId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /connections/{id} {
+      allow read, delete: if isOwner(resource.data);
+      allow create: if isOwner(request.resource.data) && request.resource.data.name is string;
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data);
+    }
+
+    match /contacts/{id} {
+      allow read, delete: if isOwner(resource.data);
+      allow create: if isOwner(request.resource.data) && ownsConnection(request.resource.data.connectionId);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data)
+        && request.resource.data.connectionId == resource.data.connectionId;
+    }
+
+    match /messages/{id} {
+      allow read, delete: if isOwner(resource.data);
+      allow create: if isOwner(request.resource.data) && ownsConnection(request.resource.data.connectionId)
+        && request.resource.data.status in ['scheduled', 'sent'];
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data)
+        && request.resource.data.connectionId == resource.data.connectionId;
+    }
+  }
+}

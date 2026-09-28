@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: disparo
+      POSTGRES_PASSWORD: disparo123
+      POSTGRES_DB: disparo
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://disparo:disparo123@db:5432/disparo
+      NEXTAUTH_SECRET: troque-por-uma-string-aleatoria
+      CRON_SECRET: troque-por-uma-string-aleatoria
+
+volumes:
+  pgdata:
